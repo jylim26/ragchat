@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>사내 RAG 챗</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin:0; background:#f6f7f9; }
+        .wrap { max-width:720px; margin:0 auto; height:100vh; display:flex; flex-direction:column; }
+        header { padding:14px 16px; background:#fff; border-bottom:1px solid #e5e7eb; font-weight:600; }
+        #chat { flex:1; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+        .msg { max-width:80%; padding:10px 12px; border-radius:12px; line-height:1.4; white-space:pre-wrap; }
+        .me { align-self:flex-end; background:#2563eb; color:white; border-bottom-right-radius:4px; }
+        .bot { align-self:flex-start; background:#fff; border:1px solid #e5e7eb; border-bottom-left-radius:4px; }
+        .cite { font-size: 0.85em; color:#555; margin-top:4px; }
+        form { display:flex; gap:8px; padding:12px; background:#fff; border-top:1px solid #e5e7eb; }
+        input,button { font-size:16px; }
+        input { flex:1; padding:12px; border:1px solid #d1d5db; border-radius:10px; }
+        button { padding:12px 16px; border:0; border-radius:10px; background:#16a34a; color:#fff; font-weight:600; cursor:pointer; }
+        button:disabled { opacity:.6; cursor:not-allowed; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header>사내 RAG 챗</header>
+    <main id="chat"></main>
+    <form id="f">
+        <input id="q" autocomplete="off" placeholder="질문을 입력하세요…" />
+        <button id="send">보내기</button>
+    </form>
+</div>
+
+<script>
+    const chat = document.getElementById('chat');
+    const form = document.getElementById('f');
+    const q = document.getElementById('q');
+    const send = document.getElementById('send');
+
+    function push(text, who, citations=[]) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + (who === 'me' ? 'me':'bot');
+      div.textContent = text;
+      chat.appendChild(div);
+
+      if (citations.length > 0) {
+        const cite = document.createElement('div');
+        cite.className = 'cite';
+        cite.innerHTML = citations.map(c => `- <b>${c.sourceName}</b>: ${c.preview}`).join("<br>");
+        chat.appendChild(cite);
+      }
+
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = q.value.trim();
+      if (!text) return;
+      q.value = ''; push(text, 'me'); send.disabled = true;
+
+      try {
+        const res = await fetch('/api/v1/sessions/temp/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: text })
+        });
+        const data = await res.json();
+        push(data.answer || '(응답 없음)', 'bot', data.citations || []);
+      } catch (err) {
+        push('에러: ' + err, 'bot');
+      } finally {
+        send.disabled = false;
+      }
+    });
+</script>
+</body>
+</html>
